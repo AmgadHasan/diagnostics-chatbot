@@ -11,7 +11,6 @@ flowchart TD
 
     subgraph API_Layer["API Layer (FastAPI)"]
         C[Routes]
-        D[Auth]
         E[Validation]
     end
 
@@ -50,6 +49,7 @@ flowchart TD
     API_Layer -->|HTTP/WebSocket| Document_Ingestion
     API_Layer -->|HTTP/WebSocket| Chat_Processing
     Document_Ingestion --> Dual_Pipeline
+    Dual_Pipeline --> Chat_Processing
     Chat_Processing --> LLM_Integration
 ```
 
@@ -60,9 +60,7 @@ flowchart TD
 - [ ] Configure Pydantic models for:
   - Document upload requests
   - Chat messages
-  - Pipeline configuration
-- [ ] Implement basic auth/rate limiting
-- [ ] Set up logging and monitoring
+
 
 #### 2. Document Ingestion System
 - [ ] Implement file upload handler (PDF/DOCX parsing)
@@ -106,3 +104,7 @@ flowchart TD
 - [ ] Write comprehensive README.md
 - [ ] Create architecture diagram
 - [ ] Document pipeline configurations and rationale
+
+#### Extras (to be done later)
+- [ ] Implement basic auth/rate limiting
+- [ ] Set up logging and monitoring
