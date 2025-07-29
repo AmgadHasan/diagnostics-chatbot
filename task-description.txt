@@ -1,0 +1,54 @@
+1. Objective
+
+Design a chat application using OSS (open-source software) that can ingest service manuals through two channels—(a) direct document upload and (b) automatic web retrieval (no manual URL input)—and answer user questions with high factual accuracy.  API calls to foundational models are permissible (OpenAI, Anthropic, Gemini, etc) and encouraged.
+
+The app should store embeddings in two different vector databases, each fed by a distinct chunking + embedding pipeline.  The agent should choose the best strategy for ingesting and retrieving context to provide accurate responses.  High-level goal is to create a troubleshooting+diagnostics chat app that can operate within and distinguish two different domains: commercial refrigeration and late-model automobiles.  
+
+2. Functional Requirements
+
+#
+
+Capability
+
+Details
+
+F1
+
+Document Upload + Ingestion
+
+UI lets a user upload PDF/DOCX
+
+F2
+
+Auto Web Retrieval
+
+The agent infers the correct manual from the chat context: it asks the user for missing make / model / manufacturer info, runs a web search (e.g., SerpAPI or Google Search API) to locate the most likely PDF/HTML manual, downloads it, extracts information, and ingests via the active pipeline.
+
+F3
+
+Dual Pipelines
+
+Implement Pipeline A (e.g., RecursiveTextSplitter → text-embedding-3-large → pgvector) and Pipeline B (e.g., Semantic Section Splitter → all-MiniLM-L12-v2 → Pinecone). Make the chunk size / overlap obvious in code.  
+
+F4
+
+Chat Interface
+
+Single‑page web UI (React, Streamlit, Gradio, etc) + websocket/REST API. Users ask free‑text questions; answers include citations (doc name + page/URL).
+
+3. Technical Requirements
+
+Your discretion - you choose the stack, but minimize the use of “AI-as-a-Service” tools.
+
+4. Deliverables
+
+GitHub repo 
+
+README.md covering:
+
+Quick‑start (Docker Compose)
+
+Architecture diagram
+
+Description of both pipelines and rationale
+
