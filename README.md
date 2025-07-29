@@ -2,37 +2,6 @@
 
 ### Architecture Overview
 
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                                Web Interface                                 │
-│  (React/Streamlit) - handles chat UI and document uploads                 │
-└───────────────────────┬───────────────────────────────────┬─────────────────┘
-                        │                                   │
-                        │ HTTP/WebSocket                    │ HTTP/WebSocket
-                        ▼                                   ▼
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                                API Layer                                      │
-│  FastAPI (Python) - routes, auth, request validation (Pydantic models)       │
-└───────────────────────┬───────────────────────────────────┬─────────────────┘
-                        │                                   │
-                        │                                   │
-┌───────────────────────▼───────┐             ┌─────────────▼─────────────────┐
-│        Document Ingestion     │             │        Chat Processing        │
-│ - File upload processing      │             │ - Question analysis           │
-│ - Web retrieval automation    │             │ - Context retrieval           │
-│ - Pipeline management         │             │ - Response generation         │
-└───────────────┬───────────────┘             └───────────────┬───────────────┘
-                │                                             │
-                │                                             │
-┌───────────────▼───────┐                         ┌───────────▼───────────────┐
-│   Dual Pipeline System                          │   LLM Integration         │
-│ - Pipeline A:                                    │ - OpenAI/Anthropic/Gemini │
-│   RecursiveTextSplitter → text-embedding-3-large│ - Response formatting     │
-│   → pgvector                                     │ - Citation generation     │
-│                                                 │                           │
-│ - Pipeline B:                                    └───────────────────────────┘
-│   SemanticSectionSplitter → all-MiniLM-L12-v2   │
-│   → Pinecone                                    │
-└────────────────────────────────────────────────┘
 ```mermaid
 flowchart TD
     subgraph Web_Interface["Web Interface (React/Streamlit)"]
