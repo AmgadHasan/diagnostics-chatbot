@@ -149,3 +149,69 @@ h1 {
 .clear-btn:hover {
     background-color: #d32f2f;
 }
+
+/* Markdown styling for messages */
+.message h1, .message h2, .message h3, .message h4, .message h5, .message h6 {
+    margin: 1em 0 0.5em 0;
+    line-height: 1.2;
+}
+
+.message h1 { font-size: 1.5em; }
+.message h2 { font-size: 1.3em; }
+.message h3 { font-size: 1.1em; }
+
+.message p {
+    margin: 0.8em 0;
+    line-height: 1.5;
+}
+
+.message ul, .message ol {
+    margin: 0.8em 0;
+    padding-left: 2em;
+}
+
+.message li {
+    margin: 0.4em 0;
+    padding-left: 0.4em;
+}
+
+.message pre {
+    background-color: rgba(0,0,0,0.05);
+    padding: 0.8em;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 0.8em 0;
+}
+
+.message code {
+    font-family: monospace;
+    background-color: rgba(0,0,0,0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.message blockquote {
+    border-left: 3px solid #ccc;
+    margin: 0.8em 0;
+    padding-left: 1em;
+    color: #666;
+    font-style: italic;
+}
+
+.message a {
+    color: #2196F3;
+    text-decoration: none;
+}
+
+.message a:hover {
+    text-decoration: underline;
+}
+
+.message strong {
+    font-weight: bold;
+}
+
+.message em {
+    font-style: italic;
+}

@@ -5,6 +5,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-input');
     const uploadButton = document.getElementById('upload-button');
     const filesList = document.getElementById('files-list');
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.className = 'loading-indicator';
+    loadingIndicator.textContent = 'Processing...';
+    loadingIndicator.style.display = 'none';
+    document.body.appendChild(loadingIndicator);
+
+    let isLoading = false;
 
     const API_BASE_URL = 'http://localhost:8000'; // FastAPI server URL
 
@@ -18,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') sendMessage();
     });
     uploadButton.addEventListener('click', uploadFile);
+    document.getElementById('clear-button').addEventListener('click', clearChat);
 
     async function loadChatHistory() {
         try {
@@ -36,17 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // Add clear chat button at the top
-            const clearButton = document.createElement('button');
-            clearButton.textContent = 'Clear Chat';
-            clearButton.classList.add('clear-btn');
-            clearButton.onclick = clearChat;
-            chatDisplay.appendChild(clearButton);
-
             messages.forEach(message => {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message', message.role === 'user' ? 'user' : 'model');
-                messageElement.textContent = message.content;
+                // Convert markdown to HTML and sanitize
+                const sanitized = DOMPurify.sanitize(marked.parse(message.content));
+                messageElement.innerHTML = sanitized;
                 chatDisplay.appendChild(messageElement);
             });
             
@@ -91,7 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', role);
-        messageElement.textContent = content;
+        // Convert markdown to HTML and sanitize
+        const sanitized = DOMPurify.sanitize(marked.parse(content));
+        messageElement.innerHTML = sanitized;
         chatDisplay.appendChild(messageElement);
         chatDisplay.scrollTop = chatDisplay.scrollHeight;
     }
@@ -166,6 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error loading files list:', error);
             filesList.innerHTML = '<li class="error-message">Failed to load files list</li>';
+        } finally {
+            isLoading = false;
+            loadingIndicator.style.display = 'none';
+            sendButton.disabled = false;
+            uploadButton.disabled = false;
         }
     }
 

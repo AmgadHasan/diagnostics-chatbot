@@ -13,6 +13,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 
 from ..schemas.document import DocumentType
+from ..services.utils import generate_file_description
 
 
 def get_qdrant_client() -> QdrantClient:
@@ -103,8 +104,6 @@ class DocumentIngestionServiceA:
             raise ValueError(f"Unsupported document type: {type}")
 
         texts = self.text_splitter.split_documents(pages)
-        print(len(texts))
-
         # Process documents in batches
         batch_size = 16
         for i in range(0, len(texts), batch_size):
@@ -112,6 +111,10 @@ class DocumentIngestionServiceA:
             self.vectorstore.add_documents(documents=batch)
 
         self.retriever = self.vectorstore.as_retriever()
+        description = await generate_file_description(
+            "\n".join([p.page_content for p in pages])
+        )
+        return description
 
     async def retrieve_chunks(self, query: str, k: int = 10) -> List[Document]:
         """Retrieve similar document chunks from the vector store.
@@ -207,6 +210,8 @@ class DocumentIngestionServiceB:
         self.vectorstore.add_documents(documents=texts)
 
         self.retriever = self.vectorstore.as_retriever()
+
+        return pages
 
     async def retrieve_chunks(self, query: str, k: int = 2) -> List[Document]:
         """Retrieve similar document chunks from the vector store.

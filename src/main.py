@@ -14,7 +14,7 @@ from .services.agent import (
     get_file_metadata,
     get_uploaded_files,
     process_chat_message,
-    query_documents,
+    search_knowledge_base,
     register_uploaded_file,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -97,7 +97,9 @@ async def upload_document(file: UploadFile, type: DocumentType) -> UploadRespons
                 await buffer.write(chunk)
 
         # Ingest document using service A
-        await document_ingestion_service_a.ingest_file(file_path=file_path, type=type)
+        description = await document_ingestion_service_a.ingest_file(
+            file_path=file_path, type=type
+        )
 
         # Register file in tracking system
         file_id = str(uuid.uuid4())
@@ -108,6 +110,7 @@ async def upload_document(file: UploadFile, type: DocumentType) -> UploadRespons
             content_type=type,
             size=file_size,
             file_path=str(file_path),
+            description=description,
         )
 
         logger.info(f"Successfully uploaded file: {file.filename} (ID: {file_id})")
@@ -254,7 +257,7 @@ async def query_documents_endpoint(request: QueryRequest) -> QueryResponse:
     """Query documents using both ingestion services."""
     try:
         logger.info(f"Processing query: {request.query} (k={request.k})")
-        results = await query_documents(request.query, request.k)
+        results = await search_knowledge_base(request.query, request.k)
         logger.info(f"Query returned {len(results)} results")
         return QueryResponse(results=results)
     except Exception as e:
