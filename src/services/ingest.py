@@ -23,7 +23,10 @@ def get_qdrant_client() -> QdrantClient:
         QdrantClient: An instance of QdrantClient connected to the specified Qdrant server.
     """
     client = QdrantClient(
-        url=os.environ.get("QDRANT_URL"), api_key=os.environ.get("QDRANT_API_KEY")
+        url=os.environ.get("QDRANT_URL"),
+        api_key=os.environ.get("QDRANT_API_KEY"),
+        https=True,
+        port=443,
     )
     return client
 
@@ -100,8 +103,13 @@ class DocumentIngestionServiceA:
             raise ValueError(f"Unsupported document type: {type}")
 
         texts = self.text_splitter.split_documents(pages)
+        print(len(texts))
 
-        self.vectorstore.add_documents(documents=texts)
+        # Process documents in batches
+        batch_size = 16
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            self.vectorstore.add_documents(documents=batch)
 
         self.retriever = self.vectorstore.as_retriever()
 

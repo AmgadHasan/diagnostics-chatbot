@@ -1,5 +1,12 @@
 # diagnostics-chatbot
 
+### Todos
+1. Add logic to handle multple users (use chat threads with unique IDs)
+2. Link documents to threads/users (currently all documents and their chunks can be accessed all the time)
+3. Improve error handling
+4. Write tests
+
+
 ### Architecture Overview
 
 ```mermaid

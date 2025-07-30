@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostics Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Diagnostics Chatbot</h1>
+        
+        <div class="chat-container">
+            <div id="chat-display" class="chat-display">
+                <div id="empty-chat" class="empty-state">
+                    <p>No messages yet. Start a conversation!</p>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Type your message...">
+                <button id="send-button">Send</button>
+            </div>
+            
+            <div class="file-upload">
+                <input type="file" id="file-input" accept=".pdf,.docx">
+                <button id="upload-button">Upload File</button>
+            </div>
+            
+            <div class="files-list">
+                <h3>Uploaded Files</h3>
+                <ul id="files-list">
+                    <li id="empty-files" class="empty-state">
+                        <p>No files uploaded yet.</p>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
