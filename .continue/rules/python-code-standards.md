@@ -11,8 +11,8 @@ src/
 ├── main.py                 # FastAPI app, includes routes
 ├── database.py             # DB session and engine
 ├── services/
-│   └── user_service.py     # Business logic
+│   └── some_service.py     # Business logic
 ├── models/
-│   └── user.py             # ORM model
+│   └── some_model.py             # ORM model
 └── schemas/
-    └── user.py             # Pydantic models
+    └── some_schema.py             # Pydantic models
