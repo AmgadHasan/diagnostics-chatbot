@@ -14,7 +14,7 @@ from pydantic_ai.messages import (
 from ..schemas.document import DocumentType
 
 client = AsyncOpenAI()
-DATA_DIR = Path(__file__).parent.parent.parent
+DATA_DIR = Path(__file__).parent.parent.parent / "storage"
 
 MESSAGES_FILE = DATA_DIR / "chat_messages.json"
 

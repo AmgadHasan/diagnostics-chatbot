@@ -1,0 +1,8 @@
+uploads/*
+chat_messages.json
+uploaded_files.json
+.venv
+api.log
+data/*.db
+.mypy_cache
+storage/*

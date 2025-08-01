@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isLoading = false;
 
-    const API_BASE_URL = 'http://localhost:8000'; // FastAPI server URL
+    const API_BASE_URL = '/api'; // Will be routed through Nginx proxy
 
     // Load initial data
     loadChatHistory();
