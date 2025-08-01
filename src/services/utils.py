@@ -13,7 +13,9 @@ from pydantic_ai.messages import (
 
 from ..schemas.document import DocumentType
 
-client = AsyncOpenAI()
+client = AsyncOpenAI(
+    base_url=os.environ.get("LLM_BASE_URL"), api_key=os.environ.get("LLM_API_KEY")
+)
 DATA_DIR = Path(__file__).parent.parent.parent / "storage"
 
 MESSAGES_FILE = DATA_DIR / "chat_messages.json"
@@ -149,31 +151,59 @@ class JSONStorage:
         with open(self.messages_file, "w") as f:
             json.dump(data, f, indent=2)
 
-    async def add_messages(self, messages: bytes, conversation_id: int = 1):
-        """Add messages to storage as a single JSON object per conversation."""
+    async def add_messages(self, messages: list, conversation_id: int = 1):
+        """Add messages to storage in ModelRequest/ModelResponse format."""
         data = await self._load_messages()
-        messages_str = messages.decode("utf-8")
+
+        # Serialize messages using ModelMessagesTypeAdapter
+        serialized = ModelMessagesTypeAdapter.dump_python(messages)
 
         # Store or update conversation
         data["conversations"][str(conversation_id)] = {
-            "messages": messages_str,
+            "messages": serialized,
             "updated_at": datetime.now(tz=timezone.utc).isoformat(),
         }
 
         await self._save_messages(data)
 
-    async def get_messages(self, conversation_id: int = 1) -> list[ModelMessage]:
+    async def get_messages(self) -> list[ModelMessage]:
         """Retrieve messages for a conversation from storage."""
         data = await self._load_messages()
-        conv_data = data["conversations"].get(str(conversation_id))
+        return ModelMessagesTypeAdapter.validate_python(data)
 
-        if conv_data and "messages" in conv_data:
-            return ModelMessagesTypeAdapter.validate_json(conv_data["messages"])
-        return []
+    async def format_for_frontend(self) -> list[dict]:
+        """Format stored messages for frontend consumption."""
+        messages = await self.get_messages()
+        chat_messages = []
+
+        from pydantic_ai.messages import (
+            ModelRequest,
+            ModelResponse,
+            TextPart,
+            UserPromptPart,
+        )
+
+        for m in messages:
+            for part in m.parts:
+                if isinstance(m, ModelRequest) and isinstance(part, UserPromptPart):
+                    chat_messages.append(
+                        {
+                            "role": "user",
+                            "timestamp": part.timestamp.isoformat(),
+                            "content": part.content,
+                        }
+                    )
+                elif isinstance(m, ModelResponse) and isinstance(part, TextPart):
+                    chat_messages.append(
+                        {
+                            "role": "model",
+                            "timestamp": m.timestamp.isoformat(),
+                            "content": part.content,
+                        }
+                    )
+
+        return chat_messages
 
     async def clear_chat_messages(self, conversation_id: int = 1):
         """Clear all chat messages for a conversation."""
-        data = await self._load_messages()
-        if str(conversation_id) in data["conversations"]:
-            del data["conversations"][str(conversation_id)]
-            await self._save_messages(data)
+        await self._save_messages([])

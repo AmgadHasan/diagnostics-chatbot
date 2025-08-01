@@ -1,20 +1,24 @@
 from __future__ import annotations as _annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Dict
-import json
 
 from langfuse import get_client
 from pydantic_ai import Agent, RunContext
+from pydantic_core import to_jsonable_python
 from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
 from pydantic_ai.messages import (
     ModelMessage,
+    ModelMessagesTypeAdapter,
 )
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.settings import ModelSettings
 
+from .ingest import ingest_file, search_knowledge_base
 from .utils import JSONStorage, get_uploaded_files
-from .ingest import search_knowledge_base, ingest_file
 
 langfuse = get_client()
 
@@ -30,15 +34,18 @@ MAIN_SYSTEM_MESSAGE = """You're an AI assistant that helps users with debugging 
 You're friendly and helpful. You ask the user clarifying questions that are needed to help them with their problem.
 Make sure that the response you return to the user is readable and nicely formatted using markdown.
 
-You have the ability to search the web for manuals and documentation to help the user.
+You have access to an internal knowledge base that consists of several file documents that can be searched using the `search_knowledge_base` tool
+You also have the ability to search the web for manuals and documentation to help the user.
 To do that, make sure to ask the user to get more information (e.g. make/model/manufacturer info for machines/equipments)
+
+Only respond with infomration available from the internal knowledge base. If there's no information, propose to search the web for relevant documents.
 
 You have access to the following tools:
 1. search_knowledge_base: Allows you to search an internal knowledge base using a query.
 2. duckduckgo_search: Allows you to search the web using the duckduck go tool
+3. ingest_file: Allows you to ingest a document file (from a url) into the knowledge base
 
-If your response is based on information retrieved from the internal knowledge base, make sure to cite it properly as follows:
-Use markdown formatting to cite using the footnote style as follows:
+If your response is based on information retrieved from the internal knowledge base, use markdown formatting to cite using the footnote style as follows:
 
 ```md
 <Some text here based on information from source 1>[^1].
@@ -61,8 +68,14 @@ class AgentDeps:
 
 
 # Initialize the AI agent
+model = OpenAIModel(
+    os.environ.get("LLM_MODEL"),
+    provider=OpenAIProvider(
+        base_url=os.environ.get("LLM_BASE_URL"), api_key=os.environ.get("LLM_API_KEY")
+    ),
+)
 agent = Agent(
-    f"openai:{os.environ.get('LLM_MODEL')}",
+    model,
     deps_type=AgentDeps,
     tools=[duckduckgo_search_tool(), search_knowledge_base, ingest_file],
     model_settings=ModelSettings(temperature=0.1),
@@ -75,7 +88,7 @@ async def get_system_prompt(ctx: RunContext[AgentDeps]) -> str:
 
     return f"""{MAIN_SYSTEM_MESSAGE}
     
-Available Uploaded Files:
+Available document files in the internal knowledge base:
 
 {json.dumps(files, ensure_ascii=False, indent=2)}
 """
@@ -84,13 +97,17 @@ Available Uploaded Files:
 async def process_chat_message(message: str, storage: JSONStorage) -> str:
     """Process a chat message and return AI response."""
     # Get chat history
-    messages = await storage.get_messages()
+    messages = await storage._load_messages()
+    message_history = ModelMessagesTypeAdapter.validate_python(messages)
 
     # Run the agent with the user prompt and chat history
-    result = await agent.run(message, message_history=messages)
+    result = await agent.run(message, message_history=message_history)
+
+    # Convert messages to JSON-serializable format before storage
+    as_python_objects = to_jsonable_python(result.all_messages())
 
     # Add new messages to storage
-    await storage.add_messages(result.new_messages_json())
+    await storage._save_messages(as_python_objects)
 
     # Return response
     return result.data
@@ -98,4 +115,6 @@ async def process_chat_message(message: str, storage: JSONStorage) -> str:
 
 async def get_chat_history(storage: JSONStorage) -> list[ModelMessage]:
     """Retrieve chat history from storage."""
-    return await storage.get_messages()
+    messages = await storage.get_messages()
+    as_python_objects = to_jsonable_python(messages)
+    return ModelMessagesTypeAdapter.validate_python(as_python_objects)

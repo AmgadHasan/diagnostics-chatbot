@@ -1,5 +1,6 @@
-from typing import Any, List, Dict
+from typing import List
 from pydantic import BaseModel
+from langchain.schema import Document
 
 
 class QueryRequest(BaseModel):
@@ -8,4 +9,4 @@ class QueryRequest(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    results: List[Dict[str, Any]]
+    results: List[Document]

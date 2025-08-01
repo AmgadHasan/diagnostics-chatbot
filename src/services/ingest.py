@@ -5,7 +5,8 @@ from typing import List
 from langchain.schema import Document
 from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader
 from langchain_experimental.text_splitter import SemanticChunker
-from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
+from langchain_nvidia import NVIDIAEmbeddings
+from langchain_openai import AzureOpenAIEmbeddings
 from langchain_postgres import PGVector
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -14,7 +15,6 @@ from qdrant_client.http.models import Distance, VectorParams
 
 from ..schemas.document import DocumentType
 from ..services.utils import generate_file_description
-
 
 # Initialize clients and embeddings once for each pipeline
 # Pipeline A (Qdrant + Azure OpenAI A)
@@ -33,7 +33,7 @@ client_a = QdrantClient(
 )
 
 # Pipeline B (PGVector + Azure OpenAI B)
-embeddings_b = OpenAIEmbeddings(
+embeddings_b = NVIDIAEmbeddings(
     model=os.environ.get("EMBEDDING_B_MODEL"),
     base_url=os.environ.get("EMBEDDING_B_API_BASE"),
     api_key=os.environ.get("EMBEDDING_B_API_KEY"),

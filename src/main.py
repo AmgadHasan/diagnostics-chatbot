@@ -9,7 +9,6 @@ from typing import List
 import aiofiles
 from fastapi import FastAPI, HTTPException, UploadFile, Response
 from .services.agent import (
-    get_chat_history,
     process_chat_message,
 )
 
@@ -154,39 +153,8 @@ async def get_chat() -> List[ChatMessage]:
     """Retrieve chat history from JSON storage."""
     try:
         logger.info("Retrieving chat history")
-        messages = await get_chat_history(storage)  # Returns all messages from JSON
-        chat_messages = []
-
-        from pydantic_ai.messages import (
-            ModelRequest,
-            ModelResponse,
-            TextPart,
-            UserPromptPart,
-        )
-
-        for m in messages:
-            first_part = m.parts[0]
-            if isinstance(m, ModelRequest):
-                if isinstance(first_part, UserPromptPart):
-                    assert isinstance(first_part.content, str)
-                    chat_messages.append(
-                        ChatMessage(
-                            role="user",
-                            timestamp=first_part.timestamp.isoformat(),
-                            content=first_part.content,
-                        )
-                    )
-            elif isinstance(m, ModelResponse):
-                if isinstance(first_part, TextPart):
-                    chat_messages.append(
-                        ChatMessage(
-                            role="model",
-                            timestamp=m.timestamp.isoformat(),
-                            content=first_part.content,
-                        )
-                    )
-
-        return chat_messages
+        formatted = await storage.format_for_frontend()
+        return [ChatMessage(**msg) for msg in formatted]
     except Exception as e:
         logger.error(f"Error retrieving chat: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error retrieving chat: {str(e)}")

@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.116.1",
     "langchain-community>=0.3.27",
     "langchain-experimental>=0.3.4",
+    "langchain-nvidia-ai-endpoints>=0.3.13",
     "langchain-openai>=0.3.28",
     "langchain-postgres>=0.0.15",
     "langchain-qdrant>=0.2.0",
