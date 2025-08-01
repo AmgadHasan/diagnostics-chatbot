@@ -1,0 +1,26 @@
+services:
+  api-dev:
+    image: ghcr.io/amgadhasan/e-commerce-expert-assistant:main
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - qdrant
+    profiles: ["dev"]
+    networks:
+      - app-network
+  
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ~/qdrant_storage:/qdrant/storage:z
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
