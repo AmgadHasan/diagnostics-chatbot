@@ -1,32 +1,56 @@
 from __future__ import annotations as _annotations
 
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-import asyncio
-from typing import Any, Dict, List, Optional
 import os
 from dataclasses import dataclass
-from .utils import generate_file_description
+from typing import Any, Dict
+import json
+
+from langfuse import get_client
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.common_tools.duckduckgo import duckduckgo_search_tool
 from pydantic_ai.messages import (
     ModelMessage,
-    ModelMessagesTypeAdapter,
 )
+from pydantic_ai.settings import ModelSettings
 
-from ..schemas.document import DocumentType
-from .ingest import (
-    document_ingestion_service_a,
-    document_ingestion_service_b,
-)
+from .utils import JSONStorage, get_uploaded_files
+from .ingest import search_knowledge_base, ingest_file
+
+langfuse = get_client()
+
+# Verify connection
+if langfuse.auth_check():
+    print("Langfuse client is authenticated and ready!")
+else:
+    print("Authentication failed. Please check your credentials and host.")
+Agent.instrument_all()
+
 
 MAIN_SYSTEM_MESSAGE = """You're an AI assistant that helps users with debugging and troubleshooting problems in industrial and mechanical systems.
 You're friendly and helpful. You ask the user clarifying questions that are needed to help them with their problem.
 Make sure that the response you return to the user is readable and nicely formatted using markdown.
 
+You have the ability to search the web for manuals and documentation to help the user.
+To do that, make sure to ask the user to get more information (e.g. make/model/manufacturer info for machines/equipments)
+
 You have access to the following tools:
 1. search_knowledge_base: Allows you to search an internal knowledge base using a query.
-2. search_web: Allows you to search the web
+2. duckduckgo_search: Allows you to search the web using the duckduck go tool
+
+If your response is based on information retrieved from the internal knowledge base, make sure to cite it properly as follows:
+Use markdown formatting to cite using the footnote style as follows:
+
+```md
+<Some text here based on information from source 1>[^1].
+<Some other text here >
+<Some text here based on information from source 2>[^2].
+
+______
+Sources:
+
+1: name: <source 1 name>, page: <page number or url>
+2: name: <source 2 name>, page: <page number or url>
+```
 
 """
 
@@ -40,152 +64,21 @@ class AgentDeps:
 agent = Agent(
     f"openai:{os.environ.get('LLM_MODEL')}",
     deps_type=AgentDeps,
-    tools=[
-        document_ingestion_service_a.retrieve_chunks,
-        document_ingestion_service_a.ingest_file,
-    ],
+    tools=[duckduckgo_search_tool(), search_knowledge_base, ingest_file],
+    model_settings=ModelSettings(temperature=0.1),
 )
 
 
 @agent.system_prompt
 async def get_system_prompt(ctx: RunContext[AgentDeps]) -> str:
     files = get_uploaded_files()
-    files_list = [f"{k}: {v}" for k, v in files.items()]
-    files_text = "\n".join(files_list)
 
     return f"""{MAIN_SYSTEM_MESSAGE}
     
 Available Uploaded Files:
-{files_text if files_text else "No files uploaded yet"}
+
+{json.dumps(files, ensure_ascii=False, indent=2)}
 """
-
-
-# Paths for storing data
-DATA_DIR = Path(__file__).parent.parent.parent
-MESSAGES_FILE = DATA_DIR / "chat_messages.json"
-UPLOADED_FILES_FILE = DATA_DIR / "uploaded_files.json"
-
-# File tracking dictionary (loaded from file)
-uploaded_files: Dict[str, Dict[str, Any]] = {}
-
-
-def _load_uploaded_files() -> Dict[str, Dict[str, Any]]:
-    """Load uploaded files metadata from file."""
-    try:
-        with open(UPLOADED_FILES_FILE, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        # If file is corrupted or doesn't exist, return empty dict
-        return {}
-
-
-def _save_uploaded_files(data: Dict[str, Dict[str, Any]]):
-    """Save uploaded files metadata to file."""
-    with open(UPLOADED_FILES_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-# Initialize uploaded_files from disk
-uploaded_files = _load_uploaded_files()
-
-
-class JSONStorage:
-    """Handles JSON file storage for chat messages."""
-
-    def __init__(self):
-        self.messages_file = MESSAGES_FILE
-        # Create file if it doesn't exist
-        if not self.messages_file.exists():
-            self.messages_file.write_text('{"conversations": {}}')
-
-    async def _load_messages(self) -> Dict[str, Any]:
-        """Load messages from JSON file."""
-        try:
-            with open(self.messages_file, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            # If file is corrupted or doesn't exist, reset it
-            with open(self.messages_file, "w") as f:
-                default_data = {"conversations": {}}
-                json.dump(default_data, f)
-            return default_data
-
-    async def _save_messages(self, data: Dict[str, Any]):
-        """Save messages to JSON file."""
-        with open(self.messages_file, "w") as f:
-            json.dump(data, f, indent=2)
-
-    async def add_messages(self, messages: bytes, conversation_id: int = 1):
-        """Add messages to storage as a single JSON object per conversation."""
-        data = await self._load_messages()
-        messages_str = messages.decode("utf-8")
-
-        # Store or update conversation
-        data["conversations"][str(conversation_id)] = {
-            "messages": messages_str,
-            "updated_at": datetime.now(tz=timezone.utc).isoformat(),
-        }
-
-        await self._save_messages(data)
-
-    async def get_messages(self, conversation_id: int = 1) -> list[ModelMessage]:
-        """Retrieve messages for a conversation from storage."""
-        data = await self._load_messages()
-        conv_data = data["conversations"].get(str(conversation_id))
-
-        if conv_data and "messages" in conv_data:
-            return ModelMessagesTypeAdapter.validate_json(conv_data["messages"])
-        return []
-
-    async def clear_chat_messages(self, conversation_id: int = 1):
-        """Clear all chat messages for a conversation."""
-        data = await self._load_messages()
-        if str(conversation_id) in data["conversations"]:
-            del data["conversations"][str(conversation_id)]
-            await self._save_messages(data)
-
-
-# Document ingestion tools for the agent
-async def ingest_document_a(file_path: str, doc_type: str) -> str:
-    """Tool for agent to ingest documents using service A."""
-    try:
-        doc_type_enum = DocumentType(doc_type)
-        await document_ingestion_service_a.ingest_file(file_path, doc_type_enum)
-        return f"Document {file_path} ingested successfully using service A"
-    except Exception as e:
-        return f"Error ingesting document: {str(e)}"
-
-
-async def ingest_document_b(file_path: str, doc_type: str) -> str:
-    """Tool for agent to ingest documents using service B."""
-    try:
-        doc_type_enum = DocumentType(doc_type)
-        await document_ingestion_service_b.ingest_file(file_path, doc_type_enum)
-        return f"Document {file_path} ingested successfully using service B"
-    except Exception as e:
-        return f"Error ingesting document: {str(e)}"
-
-
-async def retrieve_documents_a(query: str, k: int = 10) -> List[Dict[str, Any]]:
-    """Tool for agent to retrieve documents using service A."""
-    try:
-        results = await document_ingestion_service_a.retrieve_chunks(query, k)
-        return [
-            {"content": doc.page_content, "metadata": doc.metadata} for doc in results
-        ]
-    except Exception as e:
-        return [{"error": f"Error retrieving documents: {str(e)}"}]
-
-
-async def retrieve_documents_b(query: str, k: int = 10) -> List[Dict[str, Any]]:
-    """Tool for agent to retrieve documents using service B."""
-    try:
-        results = await document_ingestion_service_b.retrieve_chunks(query, k)
-        return [
-            {"content": doc.page_content, "metadata": doc.metadata} for doc in results
-        ]
-    except Exception as e:
-        return [{"error": f"Error retrieving documents: {str(e)}"}]
 
 
 async def process_chat_message(message: str, storage: JSONStorage) -> str:
@@ -206,58 +99,3 @@ async def process_chat_message(message: str, storage: JSONStorage) -> str:
 async def get_chat_history(storage: JSONStorage) -> list[ModelMessage]:
     """Retrieve chat history from storage."""
     return await storage.get_messages()
-
-
-def register_uploaded_file(
-    file_id: str,
-    filename: str,
-    content_type: DocumentType,
-    size: int,
-    file_path: str,
-    description: Optional[str] = None,
-    content: Optional[str] = None,
-):
-    """Register an uploaded file in the tracking dictionary.
-
-    Args:
-        file_id: Unique file ID
-        filename: Original filename
-        content_type: Document type
-        size: File size in bytes
-        file_path: Path to stored file
-        description: Optional manual description
-        content: Optional file content for auto-description
-    """
-    if description is None and content:
-        description = asyncio.run(generate_file_description(content))
-
-    file_data = {
-        "filename": filename,
-        "content_type": content_type,
-        "size": size,
-        "description": description,
-        "upload_timestamp": datetime.now(tz=timezone.utc).isoformat(),
-        "file_path": file_path,
-    }
-    uploaded_files[file_id] = file_data
-    _save_uploaded_files(uploaded_files)
-
-
-def get_uploaded_files() -> Dict[str, Dict[str, Any]]:
-    """Get all uploaded files metadata."""
-    return uploaded_files
-
-
-def get_file_metadata(file_id: str) -> Optional[Dict[str, Any]]:
-    """Get specific file metadata."""
-    return uploaded_files.get(file_id)
-
-
-async def search_knowledge_base(query: str, k: int = 10) -> List[Dict[str, Any]]:
-    """Query documents using both ingestion services."""
-    # Query both services
-    results_a = await retrieve_documents_a(query, k)
-    results_b = await retrieve_documents_b(query, k)
-
-    # Combine results
-    return results_a + results_b

@@ -9,14 +9,19 @@ from typing import List
 import aiofiles
 from fastapi import FastAPI, HTTPException, UploadFile, Response
 from .services.agent import (
-    JSONStorage,
     get_chat_history,
+    process_chat_message,
+)
+
+from .services.utils import (
+    JSONStorage,
     get_file_metadata,
     get_uploaded_files,
-    process_chat_message,
-    search_knowledge_base,
     register_uploaded_file,
 )
+
+from .services.ingest import search_knowledge_base, ingest_file
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from .schemas.chat import ChatMessage, ChatRequest, ChatResponse
@@ -25,7 +30,6 @@ from .schemas.files import FileListResponse, FileMetadata
 from .schemas.query import QueryRequest, QueryResponse
 from .schemas.status import StatusResponse
 from .schemas.upload import UploadResponse
-from .services.ingest import document_ingestion_service_a
 
 # Storage instance for application
 storage = JSONStorage()
@@ -88,7 +92,8 @@ async def upload_document(file: UploadFile, type: DocumentType) -> UploadRespons
 
         upload_dir = Path("uploads")
         upload_dir.mkdir(exist_ok=True)
-        file_path = upload_dir / file.filename
+        file_id = str(uuid.uuid4())
+        file_path = upload_dir / file_id
 
         # Use aiofiles for async file operations
         async with aiofiles.open(file_path, "wb") as buffer:
@@ -97,12 +102,10 @@ async def upload_document(file: UploadFile, type: DocumentType) -> UploadRespons
                 await buffer.write(chunk)
 
         # Ingest document using service A
-        description = await document_ingestion_service_a.ingest_file(
-            file_path=file_path, type=type
-        )
+        description = await ingest_file(file_path=file_path, document_type=type)
 
         # Register file in tracking system
-        file_id = str(uuid.uuid4())
+
         file_size = file_path.stat().st_size
         register_uploaded_file(
             file_id=file_id,
